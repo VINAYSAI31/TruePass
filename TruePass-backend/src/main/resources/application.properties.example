@@ -1,0 +1,20 @@
+# Copy this file to application.properties (same folder) and fill in your local password.
+# application.properties is listed in .gitignore so real passwords are never committed.
+
+spring.application.name=digital-identity-proofing
+server.port=8081
+
+# --- PostgreSQL ---
+spring.datasource.url=jdbc:postgresql://localhost:5432/identity_db
+spring.datasource.username=postgres
+spring.datasource.password=YOUR_LOCAL_DB_PASSWORD
+
+# --- JPA / Hibernate ---
+spring.jpa.hibernate.ddl-auto=update
+spring.jpa.open-in-view=false
+spring.jpa.properties.hibernate.format_sql=true
+spring.jpa.show-sql=false
+
+# --- Actuator ---
+management.endpoints.web.exposure.include=health,info
+management.endpoint.health.show-details=never
