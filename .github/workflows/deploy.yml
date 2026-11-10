@@ -30,18 +30,15 @@ jobs:
           echo "Repository: $GITHUB_REPOSITORY"
           echo "Ref: $GITHUB_REF"
           echo "Actor: $GITHUB_ACTOR"
-      
-            - name: Inspect OIDC token claims
-        env:
-          ACTIONS_ID_TOKEN_REQUEST_URL: ${{ env.ACTIONS_ID_TOKEN_REQUEST_URL }}
-          ACTIONS_ID_TOKEN_REQUEST_TOKEN: ${{ env.ACTIONS_ID_TOKEN_REQUEST_TOKEN }}
+
+      - name: Inspect OIDC token claims
         run: |
           TOKEN=$(curl -sS \
             -H "Authorization: Bearer $ACTIONS_ID_TOKEN_REQUEST_TOKEN" \
             "${ACTIONS_ID_TOKEN_REQUEST_URL}&audience=sts.amazonaws.com" \
             | jq -r '.value')
 
-          echo "$TOKEN" | cut -d '.' -f2 | base64 -d 2>/dev/null \
+          echo "$TOKEN" | cut -d '.' -f2 | tr '_-' '/+' | base64 -d 2>/dev/null \
             | jq '{iss, aud, sub}'
 
       - name: Configure AWS credentials using OIDC
@@ -71,4 +68,4 @@ jobs:
             ./TruePass-frontend
 
           docker push $AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/${{ vars.ECR_FRONTEND_REPOSITORY }}:${GITHUB_SHA}
-          docker push $AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/${{ vars.ECR_FRONTEND_REPOSITORY }}:latest
+          docker push $AWS_ACCOUNT_ID.dkr.ecr.ap-south-1.amazonaws.com/${{ vars.ECR_FRONTEND_REPOSITORY }}:latest
