@@ -2,7 +2,6 @@
 target/
 
 # Local configuration with real secrets - never commit
-src/main/resources/application.properties
 .env
 
 # IDE files
