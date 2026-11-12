@@ -22,18 +22,22 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
+      # 1. Checkout source code
       - name: Checkout source code
         uses: actions/checkout@v4
 
+      # 2. Configure AWS credentials
       - name: Configure AWS credentials using OIDC
         uses: aws-actions/configure-aws-credentials@v4
         with:
           role-to-assume: ${{ vars.AWS_ROLE_ARN }}
           aws-region: ${{ vars.AWS_REGION }}
 
+      # 3. Login to ECR
       - name: Login to Amazon ECR
         uses: aws-actions/amazon-ecr-login@v2
 
+      # 4. Build and Push Backend
       - name: Build and Push Backend Image
         run: |
           docker build \
@@ -44,6 +48,7 @@ jobs:
           docker push $AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/${{ vars.ECR_BACKEND_REPOSITORY }}:${GITHUB_SHA}
           docker push $AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/${{ vars.ECR_BACKEND_REPOSITORY }}:latest
 
+      # 5. Build and Push Frontend
       - name: Build and Push Frontend Image
         run: |
           docker build \
@@ -54,6 +59,18 @@ jobs:
           docker push $AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/${{ vars.ECR_FRONTEND_REPOSITORY }}:${GITHUB_SHA}
           docker push $AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/${{ vars.ECR_FRONTEND_REPOSITORY }}:latest
 
+      # 6. Build and Push Python Analytics
+      - name: Build and Push Analytics ETL Image
+        run: |
+          docker build \
+            -t $AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/${{ vars.ECR_ANALYTICS_REPOSITORY }}:1.0 \
+            -t $AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/${{ vars.ECR_ANALYTICS_REPOSITORY }}:${GITHUB_SHA} \
+            ./TruePass-analytics
+
+          docker push $AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/${{ vars.ECR_ANALYTICS_REPOSITORY }}:1.0
+          docker push $AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/${{ vars.ECR_ANALYTICS_REPOSITORY }}:${GITHUB_SHA}
+
+      # 7. Deploy all updated images to EC2
       - name: Deploy to EC2 using SSH
         uses: appleboy/ssh-action@v1.2.0
         with:
@@ -62,10 +79,20 @@ jobs:
           key: ${{ secrets.EC2_SSH_KEY }}
           script: |
             cd /opt/truepass
+
+            # Pull updated analytics image
+            sudo docker pull 143710972532.dkr.ecr.ap-south-1.amazonaws.com/truepass-analytics-etl:1.0
+
+            # Deploy backend and frontend
             sudo docker compose pull backend frontend
             sudo docker compose up -d --force-recreate backend frontend
+
+            # Clean unused images
             sudo docker image prune -f
 
+            echo "TruePass deployment completed."
+
+      # 8. Verify deployment workflow
       - name: Verify deployment
         run: |
-          echo "TruePass deployment workflow completed."
+          echo "TruePass backend, frontend and analytics images deployed successfully."
