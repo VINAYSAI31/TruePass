@@ -70,7 +70,38 @@ jobs:
           docker push $AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/${{ vars.ECR_ANALYTICS_REPOSITORY }}:1.0
           docker push $AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/${{ vars.ECR_ANALYTICS_REPOSITORY }}:${GITHUB_SHA}
 
-      # 7. Deploy all updated images to EC2
+      # 7. Prepare temporary directory on EC2
+      - name: Prepare EC2 monitoring files directory
+        uses: appleboy/ssh-action@v1.2.0
+        with:
+          host: ${{ secrets.EC2_HOST }}
+          username: ${{ secrets.EC2_USERNAME }}
+          key: ${{ secrets.EC2_SSH_KEY }}
+          script: |
+            mkdir -p /tmp/truepass-deploy/monitoring/prometheus
+
+      # 8. Copy monitoring Compose file to EC2
+      - name: Copy monitoring Compose file
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.EC2_HOST }}
+          username: ${{ secrets.EC2_USERNAME }}
+          key: ${{ secrets.EC2_SSH_KEY }}
+          source: "docker-compose.monitoring.yml"
+          target: "/tmp/truepass-deploy"
+
+      # 9. Copy Prometheus configuration to EC2
+      - name: Copy Prometheus configuration
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.EC2_HOST }}
+          username: ${{ secrets.EC2_USERNAME }}
+          key: ${{ secrets.EC2_SSH_KEY }}
+          source: "monitoring/prometheus/prometheus.yml"
+          target: "/tmp/truepass-deploy/monitoring/prometheus"
+          strip_components: 2
+
+      # 10. Deploy to EC2
       - name: Deploy to EC2 using SSH
         uses: appleboy/ssh-action@v1.2.0
         with:
@@ -78,21 +109,42 @@ jobs:
           username: ${{ secrets.EC2_USERNAME }}
           key: ${{ secrets.EC2_SSH_KEY }}
           script: |
+            # Install updated monitoring configuration
+            sudo install -D -m 644 \
+              /tmp/truepass-deploy/docker-compose.monitoring.yml \
+              /opt/truepass/docker-compose.monitoring.yml
+
+            sudo install -D -m 644 \
+              /tmp/truepass-deploy/monitoring/prometheus/prometheus.yml \
+              /opt/truepass/monitoring/prometheus/prometheus.yml
+
             cd /opt/truepass
 
             # Pull updated analytics image
             sudo docker pull 143710972532.dkr.ecr.ap-south-1.amazonaws.com/truepass-analytics-etl:1.0
 
-            # Deploy backend and frontend
+            # Deploy backend and frontend (existing deployment)
             sudo docker compose pull backend frontend
             sudo docker compose up -d --force-recreate backend frontend
+
+            # Pull monitoring images
+            sudo docker compose \
+              -f docker-compose.yml \
+              -f docker-compose.monitoring.yml \
+              pull prometheus grafana node-exporter cadvisor postgres-exporter
+
+            # Start monitoring services only
+            sudo docker compose \
+              -f docker-compose.yml \
+              -f docker-compose.monitoring.yml \
+              up -d prometheus grafana node-exporter cadvisor postgres-exporter
 
             # Clean unused images
             sudo docker image prune -f
 
-            echo "TruePass deployment completed."
+            echo "TruePass application and monitoring deployment completed."
 
-      # 8. Verify deployment workflow
+      # 11. Verify deployment workflow
       - name: Verify deployment
         run: |
-          echo "TruePass backend, frontend and analytics images deployed successfully."
+          echo "TruePass backend, frontend, analytics and monitoring deployment completed."

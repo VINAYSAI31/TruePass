@@ -8,7 +8,7 @@ export default function InternalLogin() {
       <div className="login-card portal-internal">
         <div className="login-head">
           <span className="portal-pill">Internal Operation</span>
-          <h1>Internal Operations Login</h1>
+          <h1>Internal OperationLoginsdof</h1>
           <p>Staff portal for managing applications and decisions.</p>
         </div>
         <LoginForm portal="INTERNAL" accounts={DEMO_ACCOUNTS.INTERNAL} />
